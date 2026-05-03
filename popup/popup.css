@@ -62,6 +62,30 @@ select {
   width: 100%;
 }
 
+details {
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 9px 10px;
+}
+
+details[open] {
+  padding-bottom: 12px;
+}
+
+summary {
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  list-style-position: outside;
+}
+
+details label {
+  margin-top: 10px;
+}
+
 .actions {
   display: flex;
   gap: 8px;

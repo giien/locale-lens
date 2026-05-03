@@ -1,8 +1,8 @@
 const DEFAULT_SETTINGS = {
   provider: "minimax",
   providerConfigs: {},
-  apiStyle: "openai",
-  endpoint: "https://api.minimaxi.com/v1/chat/completions",
+  apiStyle: "anthropic-bearer",
+  endpoint: "https://api.minimaxi.com/anthropic/v1/messages",
   model: "MiniMax-M2.7",
   apiKey: "",
   temperature: 1,
@@ -11,15 +11,15 @@ const DEFAULT_SETTINGS = {
 
 const PROVIDER_PRESETS = {
   minimax: {
-    label: "MiniMax OpenAI-compatible",
-    apiStyle: "openai",
-    endpoint: "https://api.minimaxi.com/v1/chat/completions",
-    model: "MiniMax-M2.7",
-  },
-  minimaxAnthropic: {
-    label: "MiniMax Anthropic-compatible",
+    label: "MiniMax",
     apiStyle: "anthropic-bearer",
     endpoint: "https://api.minimaxi.com/anthropic/v1/messages",
+    model: "MiniMax-M2.7",
+  },
+  minimaxOpenAI: {
+    label: "MiniMax (OpenAI-compatible)",
+    apiStyle: "openai",
+    endpoint: "https://api.minimaxi.com/v1/chat/completions",
     model: "MiniMax-M2.7",
   },
   openai: {
@@ -169,6 +169,8 @@ function buildKeywordPrompt(context, markets) {
     "4. For Spanish, consider both Spain and broad Spanish-speaking ecommerce usage.",
     "5. For Japanese, prefer natural Japanese ecommerce search phrases.",
     "6. Return valid JSON only. No markdown.",
+    "7. Keep JSON compact: max 5 coreTerms, max 3 headTerms and 4 longTailTerms per market, localExpressionNotes under 40 Chinese characters.",
+    "8. Do not include comments, trailing commas, code fences, or explanatory prose.",
     "",
     "Markets:",
     markets,
@@ -237,7 +239,7 @@ async function callAnthropicMessages(settings, context) {
     headers: buildAnthropicHeaders(settings.apiStyle, apiKey),
     body: JSON.stringify({
       model: settings.model,
-      max_tokens: 1600,
+      max_tokens: 3200,
       temperature: Number(settings.temperature ?? 1),
       system: "You produce compact, valid JSON for ecommerce keyword localization.",
       messages: [
@@ -320,17 +322,105 @@ function extractOpenAICompatibleContent(payload) {
 
 function parseJsonContent(content) {
   const withoutThinking = String(content).replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-  const withoutFence = withoutThinking.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  const withoutFence = withoutThinking
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
   try {
     return JSON.parse(withoutFence);
-  } catch (_error) {
-    const start = withoutFence.indexOf("{");
-    const end = withoutFence.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      return JSON.parse(withoutFence.slice(start, end + 1));
+  } catch (firstError) {
+    const jsonText = extractLikelyJsonObject(withoutFence);
+    if (jsonText) {
+      const repaired = repairJsonText(jsonText);
+      try {
+        return JSON.parse(repaired);
+      } catch (repairError) {
+        throw new Error(
+          `AI response was not valid JSON after repair: ${repairError.message}. Original error: ${firstError.message}`,
+        );
+      }
     }
-    throw new Error("AI response was not valid JSON.");
+    throw new Error(`AI response was not valid JSON: ${firstError.message}`);
   }
+}
+
+function extractLikelyJsonObject(text) {
+  const start = text.indexOf("{");
+  if (start < 0) return "";
+
+  let inString = false;
+  let escape = false;
+  let depth = 0;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === "\\") {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+
+    if (char === "{") depth += 1;
+    if (char === "}") depth -= 1;
+    if (depth === 0) return text.slice(start, index + 1);
+  }
+
+  return text.slice(start);
+}
+
+function repairJsonText(text) {
+  let repaired = text
+    .replace(/```(?:json)?/gi, "")
+    .replace(/```/g, "")
+    .replace(/"\s+"/g, '","')
+    .replace(/}\s*{/g, "},{")
+    .replace(/]\s*\[/g, "],[")
+    .replace(/,\s*([}\]])/g, "$1")
+    .trim();
+
+  const balance = getJsonBalance(repaired);
+  if (balance.inString) repaired += '"';
+  if (balance.square > 0) repaired += "]".repeat(balance.square);
+  if (balance.curly > 0) repaired += "}".repeat(balance.curly);
+  return repaired;
+}
+
+function getJsonBalance(text) {
+  let curly = 0;
+  let square = 0;
+  let inString = false;
+  let escape = false;
+
+  for (const char of text) {
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === "\\") {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+
+    if (char === "{") curly += 1;
+    if (char === "}") curly = Math.max(0, curly - 1);
+    if (char === "[") square += 1;
+    if (char === "]") square = Math.max(0, square - 1);
+  }
+
+  return { curly, square, inString };
 }
 
 function normalizeAnalysis(analysis, fallbackTitle) {
@@ -471,17 +561,21 @@ function normalizeProviderConfig(provider, config = {}) {
   const normalized = { ...config };
 
   if (provider === "minimax") {
-    if (!normalized.endpoint || normalized.endpoint.includes("api.minimax.io")) {
+    if (
+      !normalized.endpoint
+      || normalized.endpoint.includes("api.minimax.io")
+      || normalized.endpoint === "https://api.minimaxi.com/v1/chat/completions"
+    ) {
       normalized.endpoint = PROVIDER_PRESETS.minimax.endpoint;
     }
-    normalized.apiStyle = "openai";
+    normalized.apiStyle = "anthropic-bearer";
   }
 
-  if (provider === "minimaxAnthropic") {
+  if (provider === "minimaxOpenAI") {
     if (!normalized.endpoint || normalized.endpoint.includes("api.minimax.io")) {
-      normalized.endpoint = PROVIDER_PRESETS.minimaxAnthropic.endpoint;
+      normalized.endpoint = PROVIDER_PRESETS.minimaxOpenAI.endpoint;
     }
-    normalized.apiStyle = "anthropic-bearer";
+    normalized.apiStyle = "openai";
   }
 
   return normalized;

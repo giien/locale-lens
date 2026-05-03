@@ -1,8 +1,8 @@
 const DEFAULT_SETTINGS = {
   provider: "minimax",
   providerConfigs: {},
-  apiStyle: "openai",
-  endpoint: "https://api.minimaxi.com/v1/chat/completions",
+  apiStyle: "anthropic-bearer",
+  endpoint: "https://api.minimaxi.com/anthropic/v1/messages",
   model: "MiniMax-M2.7",
   apiKey: "",
   temperature: 1,
@@ -40,8 +40,8 @@ async function loadProviderPresets() {
   if (response?.ok) return response.data;
   return {
     minimax: {
-      label: "MiniMax OpenAI-compatible",
-      apiStyle: "openai",
+      label: "MiniMax",
+      apiStyle: "anthropic-bearer",
       endpoint: DEFAULT_SETTINGS.endpoint,
       model: DEFAULT_SETTINGS.model,
     },

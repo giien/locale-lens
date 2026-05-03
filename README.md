@@ -22,7 +22,7 @@ Chrome Manifest V3 prototype for Amazon cross-market keyword research.
 5. Click the extension icon or open the extension options page and save your model provider API key.
 6. Refresh an Amazon search page and click `AI 分析` below a product title.
 
-Clicking the extension icon opens a small popup where you can configure a model provider.
+Clicking the extension icon opens a small popup where you can configure a model provider. The default view only asks for provider and API key; endpoint, model, and API style live under `高级设置`.
 Each provider keeps its own endpoint, model, API style, and API key, so switching providers will restore that provider's saved configuration instead of reusing another provider's key.
 
 ## Model providers
@@ -30,7 +30,7 @@ Each provider keeps its own endpoint, model, API style, and API key, so switchin
 LocaleLens includes presets for:
 
 - MiniMax
-- MiniMax Anthropic-compatible
+- MiniMax OpenAI-compatible
 - OpenAI
 - OpenRouter
 - DeepSeek
@@ -45,8 +45,8 @@ Most providers use the OpenAI-compatible `chat/completions` format. Anthropic us
 
 ## MiniMax defaults
 
-- Endpoint: `https://api.minimaxi.com/v1/chat/completions`
-- Anthropic-compatible endpoint: `https://api.minimaxi.com/anthropic/v1/messages`
+- Default endpoint: `https://api.minimaxi.com/anthropic/v1/messages`
+- OpenAI-compatible endpoint: `https://api.minimaxi.com/v1/chat/completions`
 - Model: `MiniMax-M2.7`
 
 MiniMax supports OpenAI-compatible chat completions at `/v1/chat/completions` and recommends Anthropic-compatible access in its AI SDK provider docs.

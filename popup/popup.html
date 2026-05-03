@@ -20,28 +20,32 @@
         </label>
 
         <label>
-          <span>API Style</span>
-          <select id="apiStyle">
-            <option value="openai">OpenAI-compatible</option>
-            <option value="anthropic">Anthropic Messages</option>
-            <option value="anthropic-bearer">Anthropic-compatible Bearer</option>
-          </select>
-        </label>
-
-        <label>
-          <span>Endpoint</span>
-          <input id="endpoint" type="url" autocomplete="off">
-        </label>
-
-        <label>
-          <span>Model</span>
-          <input id="model" type="text" autocomplete="off">
-        </label>
-
-        <label>
           <span>API Key</span>
           <input id="apiKey" type="password" autocomplete="off" placeholder="sk-...">
         </label>
+
+        <details id="advanced-config">
+          <summary>高级设置</summary>
+
+          <label>
+            <span>API Style</span>
+            <select id="apiStyle">
+              <option value="openai">OpenAI-compatible</option>
+              <option value="anthropic">Anthropic Messages</option>
+              <option value="anthropic-bearer">Anthropic-compatible Bearer</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Endpoint</span>
+            <input id="endpoint" type="url" autocomplete="off">
+          </label>
+
+          <label>
+            <span>Model</span>
+            <input id="model" type="text" autocomplete="off">
+          </label>
+        </details>
 
         <button id="save" type="submit">保存配置</button>
       </form>

@@ -5,6 +5,7 @@ const apiStyleInput = document.querySelector("#apiStyle");
 const endpointInput = document.querySelector("#endpoint");
 const modelInput = document.querySelector("#model");
 const apiKeyInput = document.querySelector("#apiKey");
+const advancedConfig = document.querySelector("#advanced-config");
 const openOptionsButton = document.querySelector("#open-options");
 const openAmazonButton = document.querySelector("#open-amazon");
 
@@ -20,7 +21,7 @@ async function init() {
   const settings = await chrome.storage.sync.get({
     provider: "minimax",
     providerConfigs: {},
-    apiStyle: "openai",
+    apiStyle: "anthropic-bearer",
     endpoint: providerPresets.minimax.endpoint,
     model: providerPresets.minimax.model,
     apiKey: "",
@@ -32,6 +33,7 @@ async function init() {
   providerInput.value = settings.provider || "minimax";
   const activeConfig = getSavedConfig(providerInput.value, settings);
   applyProviderConfig(providerInput.value, activeConfig);
+  advancedConfig.open = shouldShowAdvanced(providerInput.value, activeConfig);
 
   if (activeConfig.apiKey) {
     statusNode.textContent = "API 已配置。去 Amazon 页面刷新后使用。";
@@ -47,9 +49,9 @@ async function loadProviderPresets() {
   if (response?.ok) return response.data;
   return {
     minimax: {
-      label: "MiniMax OpenAI-compatible",
-      apiStyle: "openai",
-      endpoint: "https://api.minimaxi.com/v1/chat/completions",
+      label: "MiniMax",
+      apiStyle: "anthropic-bearer",
+      endpoint: "https://api.minimaxi.com/anthropic/v1/messages",
       model: "MiniMax-M2.7",
     },
     custom: {
@@ -68,7 +70,9 @@ function renderProviderOptions(presets) {
 }
 
 providerInput.addEventListener("change", () => {
-  applyProviderConfig(providerInput.value, getSavedConfig(providerInput.value));
+  const config = getSavedConfig(providerInput.value);
+  applyProviderConfig(providerInput.value, config);
+  advancedConfig.open = shouldShowAdvanced(providerInput.value, config);
 });
 
 form.addEventListener("submit", async (event) => {
@@ -140,6 +144,16 @@ function applyProviderConfig(provider, config = {}) {
   endpointInput.value = config.endpoint || preset.endpoint || "";
   modelInput.value = config.model || preset.model || "";
   apiKeyInput.value = config.apiKey || "";
+}
+
+function shouldShowAdvanced(provider, config = {}) {
+  const preset = getPreset(provider);
+  if (provider === "custom") return true;
+  return Boolean(
+    (config.endpoint && preset.endpoint && config.endpoint !== preset.endpoint)
+    || (config.model && preset.model && config.model !== preset.model)
+    || (config.apiStyle && preset.apiStyle && config.apiStyle !== preset.apiStyle),
+  );
 }
 
 function isPlainObject(value) {
