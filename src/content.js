@@ -117,6 +117,7 @@ function ensureKeywordModule(anchor) {
         <div class="gks-eyebrow">LocaleLens AI Terms</div>
         <div class="gks-subtitle">从标题提取核心词，再翻译成本地搜索表达</div>
       </div>
+      <button class="gks-collapse-button" type="button" data-gks-collapse>收起</button>
     </div>
     <div class="gks-body">
       ${renderLoading()}
@@ -193,6 +194,9 @@ function renderAnalysis(analysis) {
       <div class="gks-chip-row">
         ${coreTerms.map(renderCoreTerm).join('')}
       </div>
+      <div class="gks-research-row">
+        ${renderResearchLinks(coreTerms)}
+      </div>
     </div>
     <div class="gks-market-grid">
       ${markets.map(renderMarket).join('')}
@@ -221,6 +225,7 @@ function renderMarket(market) {
   const marketCode = normalizeMarketCode(market.market);
   const searchTerm = head[0] || longTail[0] || '';
   const searchUrl = buildAmazonSearchUrl(marketCode, searchTerm);
+  const tikTokSearchUrl = buildTikTokSearchUrl(searchTerm);
 
   return `
     <article class="gks-market">
@@ -229,13 +234,47 @@ function renderMarket(market) {
           <b>${escapeHtml(market.market)}</b>
           <span>${escapeHtml(market.language || '')}</span>
         </div>
-        ${searchUrl ? `<a class="gks-open-link" href="${escapeHtml(searchUrl)}" target="_blank" rel="noopener noreferrer" title="打开 ${escapeHtml(searchTerm)} 的 ${escapeHtml(marketCode)} 搜索页">打开</a>` : ''}
+        <div class="gks-market-actions">
+          ${searchUrl ? `<a class="gks-open-link" href="${escapeHtml(searchUrl)}" target="_blank" rel="noopener noreferrer" title="打开 ${escapeHtml(searchTerm)} 的 ${escapeHtml(marketCode)} Amazon 搜索页">Amazon</a>` : ''}
+          ${tikTokSearchUrl ? `<a class="gks-open-link gks-tiktok-link" href="${escapeHtml(tikTokSearchUrl)}" target="_blank" rel="noopener noreferrer" title="打开 TikTok 搜索：${escapeHtml(searchTerm)}">TikTok</a>` : ''}
+        </div>
       </div>
       <div class="gks-term-line">${head.map((term) => `<span>${escapeHtml(term)}</span>`).join('')}</div>
       <div class="gks-tail-line">${longTail.map((term) => `<span>${escapeHtml(term)}</span>`).join('')}</div>
       ${market.localExpressionNotes ? `<p>${escapeHtml(market.localExpressionNotes)}</p>` : ''}
     </article>
   `;
+}
+
+function renderResearchLinks(coreTerms) {
+  const terms = (coreTerms || [])
+    .map((item) => item.term)
+    .filter(Boolean)
+    .slice(0, 4);
+  if (!terms.length) return '';
+
+  const mainTerm = terms[0];
+  const links = [
+    {
+      label: 'TikTok Search',
+      href: buildTikTokSearchUrl(mainTerm),
+      title: `打开 TikTok 搜索：${mainTerm}`,
+    },
+    {
+      label: `#${toHashTag(mainTerm)}`,
+      href: buildTikTokTagUrl(mainTerm),
+      title: `打开 TikTok tag：${mainTerm}`,
+    },
+    {
+      label: 'Google Trends',
+      href: buildGoogleTrendsUrl(mainTerm),
+      title: `打开 Google Trends：${mainTerm}`,
+    },
+  ].filter((link) => link.href);
+
+  return links.map((link) => `
+    <a class="gks-research-link" href="${escapeHtml(link.href)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(link.title)}">${escapeHtml(link.label)}</a>
+  `).join('');
 }
 
 function renderError(error) {
@@ -252,6 +291,13 @@ document.addEventListener('click', (event) => {
   const target = event.target;
   if (target?.matches?.('[data-gks-open-options]')) {
     chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' });
+  }
+
+  if (target?.matches?.('[data-gks-collapse]')) {
+    const module = target.closest(`.${MODULE_CLASS}`);
+    if (!module) return;
+    const collapsed = module.classList.toggle('gks-collapsed');
+    target.textContent = collapsed ? '展开' : '收起';
   }
 });
 
@@ -284,6 +330,38 @@ function buildAmazonSearchUrl(marketCode, searchTerm) {
   const url = new URL(`https://${host}/s`);
   url.searchParams.set('k', term);
   return url.toString();
+}
+
+function buildTikTokSearchUrl(searchTerm) {
+  const term = String(searchTerm || '').trim();
+  if (!term) return '';
+
+  const url = new URL('https://www.tiktok.com/search');
+  url.searchParams.set('q', term);
+  return url.toString();
+}
+
+function buildTikTokTagUrl(searchTerm) {
+  const tag = toHashTag(searchTerm);
+  return tag ? `https://www.tiktok.com/tag/${encodeURIComponent(tag)}` : '';
+}
+
+function buildGoogleTrendsUrl(searchTerm) {
+  const term = String(searchTerm || '').trim();
+  if (!term) return '';
+
+  const url = new URL('https://trends.google.com/trends/explore');
+  url.searchParams.set('q', term);
+  return url.toString();
+}
+
+function toHashTag(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+    .trim()
+    .replace(/[\s_-]+/g, '')
+    .slice(0, 60);
 }
 
 function escapeHtml(value) {

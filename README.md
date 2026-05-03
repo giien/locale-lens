@@ -9,6 +9,8 @@ Chrome Manifest V3 prototype for Amazon cross-market keyword research.
 - Asks the model to extract ecommerce keywords and localize them for US, CN, DE, FR, ES, and JP markets.
 - Renders head terms, long-tail terms, and local expression notes under the title.
 - Adds an `打开` link for supported Amazon marketplaces, opening the localized head term on the target Amazon search URL.
+- Adds compact collapse/expand controls for the analysis module.
+- Adds TikTok Search, TikTok hashtag, and Google Trends exploration links for fast product-development validation.
 
 ## Local install
 

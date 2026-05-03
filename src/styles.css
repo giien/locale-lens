@@ -69,6 +69,31 @@
   border-bottom: 1px solid #e5eef8;
 }
 
+.gks-collapse-button {
+  background: #eef2f7;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #334155;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
+.gks-collapse-button:hover {
+  background: #e2e8f0;
+}
+
+.gks-keyword-module.gks-collapsed .gks-body {
+  display: none;
+}
+
+.gks-keyword-module.gks-collapsed {
+  max-width: 520px;
+}
+
 .gks-eyebrow {
   color: #174b7a;
   font-size: 12px;
@@ -146,6 +171,30 @@
   font-size: 10px;
 }
 
+.gks-research-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.gks-research-link {
+  background: #ecfdf5;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  color: #0f766e !important;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px 7px;
+  text-decoration: none !important;
+}
+
+.gks-research-link:hover {
+  background: #ccfbf1;
+}
+
 .gks-market-grid {
   display: grid;
   gap: 6px;
@@ -169,6 +218,12 @@
 
 .gks-market-head div {
   min-width: 0;
+}
+
+.gks-market-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
 }
 
 .gks-market-head b {
@@ -200,6 +255,14 @@
 
 .gks-open-link:hover {
   background: #1d4ed8;
+}
+
+.gks-tiktok-link {
+  background: #111827;
+}
+
+.gks-tiktok-link:hover {
+  background: #374151;
 }
 
 .gks-term-line,
