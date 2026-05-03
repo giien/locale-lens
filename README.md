@@ -2,6 +2,8 @@
 
 Chrome Manifest V3 prototype for Amazon cross-market keyword research.
 
+![LocaleLens icon](assets/icon-128.png)
+
 ## What it does
 
 - Adds a compact `AI 分析` button below Amazon search-result product titles.
