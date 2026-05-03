@@ -215,7 +215,7 @@ async function callOpenAICompatible(settings, context) {
 
   const body = await response.text();
   if (!response.ok) {
-    throw new Error(`AI request failed (${response.status}): ${body.slice(0, 240)}`);
+    throwProviderRequestError(settings, response.status, body);
   }
 
   const payload = JSON.parse(body);
@@ -251,7 +251,7 @@ async function callAnthropicMessages(settings, context) {
 
   const body = await response.text();
   if (!response.ok) {
-    throw new Error(`AI request failed (${response.status}): ${body.slice(0, 240)}`);
+    throwProviderRequestError(settings, response.status, body);
   }
 
   const payload = JSON.parse(body);
@@ -368,7 +368,10 @@ function toStringList(value) {
 async function getSettings() {
   const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   const preset = PROVIDER_PRESETS[stored.provider] || PROVIDER_PRESETS.minimax;
-  const providerConfig = getProviderConfig(stored.provider, stored.providerConfigs, stored);
+  const providerConfig = normalizeProviderConfig(
+    stored.provider,
+    getProviderConfig(stored.provider, stored.providerConfigs, stored),
+  );
 
   return {
     ...DEFAULT_SETTINGS,
@@ -406,12 +409,12 @@ async function saveSettings(payload) {
     temperature: clamp(Number(payload?.temperature ?? DEFAULT_SETTINGS.temperature), 0, 1),
   };
 
-  providerConfigs[provider] = providerConfig;
+  providerConfigs[provider] = normalizeProviderConfig(provider, providerConfig);
 
   const settings = {
     provider,
     providerConfigs,
-    ...providerConfig,
+    ...providerConfigs[provider],
     markets: Array.isArray(payload?.markets) && payload.markets.length ? payload.markets : DEFAULT_SETTINGS.markets,
   };
 
@@ -443,6 +446,18 @@ function normalizeError(error) {
   return error?.message || String(error || "Unknown error");
 }
 
+function throwProviderRequestError(settings, status, body) {
+  const providerName = PROVIDER_PRESETS[settings.provider]?.label || settings.provider;
+  const hint = [
+    `Provider: ${providerName}`,
+    `API Style: ${settings.apiStyle}`,
+    `Endpoint: ${settings.endpoint}`,
+    `Model: ${settings.model}`,
+  ].join(" | ");
+
+  throw new Error(`AI request failed (${status}): ${body.slice(0, 240)}\n${hint}`);
+}
+
 function normalizeApiKey(value) {
   return String(value || "")
     .normalize("NFKC")
@@ -450,6 +465,26 @@ function normalizeApiKey(value) {
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .replace(/\s+/g, "")
     .trim();
+}
+
+function normalizeProviderConfig(provider, config = {}) {
+  const normalized = { ...config };
+
+  if (provider === "minimax") {
+    if (!normalized.endpoint || normalized.endpoint.includes("api.minimax.io")) {
+      normalized.endpoint = PROVIDER_PRESETS.minimax.endpoint;
+    }
+    normalized.apiStyle = "openai";
+  }
+
+  if (provider === "minimaxAnthropic") {
+    if (!normalized.endpoint || normalized.endpoint.includes("api.minimax.io")) {
+      normalized.endpoint = PROVIDER_PRESETS.minimaxAnthropic.endpoint;
+    }
+    normalized.apiStyle = "anthropic-bearer";
+  }
+
+  return normalized;
 }
 
 function getProviderConfig(provider, providerConfigs, stored) {
