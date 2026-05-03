@@ -1,4 +1,4 @@
-# Global Keyword Scout
+# LocaleLens
 
 Chrome Manifest V3 prototype for Amazon cross-market keyword research.
 

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Global Keyword Scout",
+  "name": "LocaleLens",
   "version": "0.1.0",
   "description": "AI keyword localization assistant for Amazon and cross-market product research.",
   "permissions": ["storage"],
@@ -36,7 +36,7 @@
   ],
   "options_page": "options/options.html",
   "action": {
-    "default_title": "Global Keyword Scout",
+    "default_title": "LocaleLens",
     "default_popup": "popup/popup.html"
   }
 }

@@ -114,7 +114,7 @@ function ensureKeywordModule(anchor) {
   root.innerHTML = `
     <div class="gks-header">
       <div>
-        <div class="gks-eyebrow">Global AI Terms</div>
+        <div class="gks-eyebrow">LocaleLens AI Terms</div>
         <div class="gks-subtitle">从标题提取核心词，再翻译成本地搜索表达</div>
       </div>
     </div>
