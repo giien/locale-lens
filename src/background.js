@@ -112,6 +112,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "TEST_SETTINGS") {
+    testSettings(message.payload)
+      .then((result) => sendResponse({ ok: true, data: result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeError(error) }));
+    return true;
+  }
+
   if (message?.type === "OPEN_OPTIONS") {
     chrome.runtime.openOptionsPage();
     sendResponse({ ok: true });
@@ -148,6 +155,35 @@ async function analyzeTitle(payload) {
   return analysis;
 }
 
+async function testSettings(payload) {
+  const provider = String(payload?.provider || DEFAULT_SETTINGS.provider).trim();
+  const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.custom;
+  const settings = normalizeProviderConfig(provider, {
+    provider,
+    apiStyle: String(payload?.apiStyle || preset.apiStyle || DEFAULT_SETTINGS.apiStyle).trim(),
+    endpoint: String(payload?.endpoint || preset.endpoint || DEFAULT_SETTINGS.endpoint).trim(),
+    model: String(payload?.model || preset.model || DEFAULT_SETTINGS.model).trim(),
+    apiKey: normalizeApiKey(payload?.apiKey || ""),
+    temperature: clamp(Number(payload?.temperature ?? DEFAULT_SETTINGS.temperature), 0, 1),
+  });
+
+  settings.provider = provider;
+  settings.markets = DEFAULT_SETTINGS.markets;
+
+  if (!settings.apiKey) {
+    throw new Error("请先填写 API Key。");
+  }
+  validateHeaderSafeApiKey(settings.apiKey);
+
+  const content = await callProviderSmokeTest(settings);
+  return {
+    provider,
+    endpoint: settings.endpoint,
+    model: settings.model,
+    sample: content.slice(0, 80),
+  };
+}
+
 async function callConfiguredProvider(settings, context) {
   const apiStyle = settings.apiStyle || "openai";
   if (apiStyle === "anthropic" || apiStyle === "anthropic-bearer") {
@@ -155,6 +191,69 @@ async function callConfiguredProvider(settings, context) {
   }
 
   return callOpenAICompatible(settings, context);
+}
+
+async function callProviderSmokeTest(settings) {
+  const apiStyle = settings.apiStyle || "openai";
+  const prompt = 'Reply with exactly this JSON: {"ok":true}';
+  if (apiStyle === "anthropic" || apiStyle === "anthropic-bearer") {
+    return callAnthropicSmokeTest(settings, prompt);
+  }
+
+  return callOpenAISmokeTest(settings, prompt);
+}
+
+async function callOpenAISmokeTest(settings, prompt) {
+  const apiKey = normalizeApiKey(settings.apiKey);
+  validateHeaderSafeApiKey(apiKey);
+
+  const response = await fetch(settings.endpoint, {
+    method: "POST",
+    headers: buildOpenAICompatibleHeaders(settings.provider, apiKey),
+    body: JSON.stringify({
+      model: settings.model,
+      temperature: Number(settings.temperature ?? 1),
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    throwProviderRequestError(settings, response.status, body);
+  }
+
+  const payload = JSON.parse(body);
+  const content = extractOpenAICompatibleContent(payload);
+  if (!content) throw new Error("测试成功收到响应，但没有文本内容。");
+  return content;
+}
+
+async function callAnthropicSmokeTest(settings, prompt) {
+  const apiKey = normalizeApiKey(settings.apiKey);
+  validateHeaderSafeApiKey(apiKey);
+
+  const response = await fetch(settings.endpoint, {
+    method: "POST",
+    headers: buildAnthropicHeaders(settings.apiStyle, apiKey),
+    body: JSON.stringify({
+      model: settings.model,
+      max_tokens: 64,
+      temperature: Number(settings.temperature ?? 1),
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    throwProviderRequestError(settings, response.status, body);
+  }
+
+  const payload = JSON.parse(body);
+  const content = Array.isArray(payload.content)
+    ? payload.content.filter((item) => item?.type === "text").map((item) => item.text).join("\n")
+    : "";
+  if (!content) throw new Error("测试成功收到响应，但没有文本内容。");
+  return content;
 }
 
 function buildKeywordPrompt(context, markets) {

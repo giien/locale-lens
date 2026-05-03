@@ -6,6 +6,7 @@ const endpointInput = document.querySelector("#endpoint");
 const modelInput = document.querySelector("#model");
 const apiKeyInput = document.querySelector("#apiKey");
 const advancedConfig = document.querySelector("#advanced-config");
+const testButton = document.querySelector("#test");
 const openOptionsButton = document.querySelector("#open-options");
 const openAmazonButton = document.querySelector("#open-amazon");
 
@@ -112,6 +113,44 @@ form.addEventListener("submit", async (event) => {
     statusNode.className = "missing";
   }
 });
+
+testButton.addEventListener("click", async () => {
+  const provider = providerInput.value;
+  const payload = buildPayload(provider);
+  testButton.disabled = true;
+  testButton.textContent = "测试中";
+  statusNode.textContent = "正在测试当前 Provider...";
+  statusNode.className = "";
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "TEST_SETTINGS",
+      payload,
+    });
+
+    if (!response?.ok) throw new Error(response?.error || "测试失败。");
+    statusNode.textContent = `测试成功：${response.data.model}`;
+    statusNode.className = "ready";
+  } catch (error) {
+    statusNode.textContent = error?.message || String(error);
+    statusNode.className = "missing";
+  } finally {
+    testButton.disabled = false;
+    testButton.textContent = "测试连接";
+  }
+});
+
+function buildPayload(provider) {
+  return {
+    provider,
+    apiStyle: apiStyleInput.value,
+    endpoint: endpointInput.value.trim(),
+    model: modelInput.value.trim(),
+    apiKey: normalizeApiKey(apiKeyInput.value),
+    temperature: 1,
+    markets: ["US", "CN", "DE", "FR", "ES", "JP"],
+  };
+}
 
 function getPreset(provider) {
   return providerPresets[provider] || providerPresets.custom || {};

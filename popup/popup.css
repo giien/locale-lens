@@ -86,7 +86,8 @@ details label {
   margin-top: 10px;
 }
 
-.actions {
+.actions,
+.form-actions {
   display: flex;
   gap: 8px;
 }
@@ -103,7 +104,13 @@ button {
 #save {
   background: #2563eb;
   color: #fff;
-  width: 100%;
+  flex: 1;
+}
+
+#test {
+  background: #0f766e;
+  color: #fff;
+  flex: 1;
 }
 
 #open-options {

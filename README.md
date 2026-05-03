@@ -24,6 +24,7 @@ Chrome Manifest V3 prototype for Amazon cross-market keyword research.
 
 Clicking the extension icon opens a small popup where you can configure a model provider. The default view only asks for provider and API key; endpoint, model, and API style live under `高级设置`.
 Each provider keeps its own endpoint, model, API style, and API key, so switching providers will restore that provider's saved configuration instead of reusing another provider's key.
+Use `测试连接` in the popup to send a tiny smoke-test request before running a full Amazon title analysis.
 
 ## Model providers
 
