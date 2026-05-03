@@ -1,19 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="LocaleLens icon">
-  <defs>
-    <linearGradient id="bg" x1="18" y1="14" x2="110" y2="116" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#1D4ED8"/>
-      <stop offset="0.54" stop-color="#0F766E"/>
-      <stop offset="1" stop-color="#F59E0B"/>
-    </linearGradient>
-    <linearGradient id="lens" x1="34" y1="28" x2="88" y2="86" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#F8FBFF"/>
-      <stop offset="1" stop-color="#DCEAFE"/>
-    </linearGradient>
-  </defs>
-  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
-  <circle cx="58" cy="55" r="31" fill="url(#lens)" stroke="#FFFFFF" stroke-width="6"/>
-  <path d="M36 55h44M58 25c9 8 14 18 14 30s-5 22-14 30M58 25c-9 8-14 18-14 30s5 22 14 30" fill="none" stroke="#1D4ED8" stroke-width="4" stroke-linecap="round" opacity="0.82"/>
-  <path d="M80 78l25 25" fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round"/>
-  <path d="M80 78l25 25" fill="none" stroke="#0F172A" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="91" cy="35" r="8" fill="#F59E0B" stroke="#FFFFFF" stroke-width="4"/>
+  <rect width="128" height="128" rx="28" fill="#2563EB"/>
+  <circle cx="56" cy="54" r="29" fill="none" stroke="#FFFFFF" stroke-width="10"/>
+  <path d="M77 75l29 29" fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round"/>
+  <path d="M42 54h28M56 30c7 7 11 15 11 24s-4 17-11 24M56 30c-7 7-11 15-11 24s4 17 11 24" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" opacity="0.86"/>
 </svg>

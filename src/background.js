@@ -1,3 +1,5 @@
+importScripts("provider-presets.js");
+
 const DEFAULT_SETTINGS = {
   provider: "minimax",
   providerConfigs: {},
@@ -9,74 +11,7 @@ const DEFAULT_SETTINGS = {
   markets: ["US", "CN", "DE", "FR", "ES", "JP"],
 };
 
-const PROVIDER_PRESETS = {
-  minimax: {
-    label: "MiniMax",
-    apiStyle: "anthropic-bearer",
-    endpoint: "https://api.minimaxi.com/anthropic/v1/messages",
-    model: "MiniMax-M2.7",
-  },
-  minimaxOpenAI: {
-    label: "MiniMax (OpenAI-compatible)",
-    apiStyle: "openai",
-    endpoint: "https://api.minimaxi.com/v1/chat/completions",
-    model: "MiniMax-M2.7",
-  },
-  openai: {
-    label: "OpenAI",
-    apiStyle: "openai",
-    endpoint: "https://api.openai.com/v1/chat/completions",
-    model: "gpt-4o-mini",
-  },
-  openrouter: {
-    label: "OpenRouter",
-    apiStyle: "openai",
-    endpoint: "https://openrouter.ai/api/v1/chat/completions",
-    model: "openai/gpt-4o-mini",
-  },
-  deepseek: {
-    label: "DeepSeek",
-    apiStyle: "openai",
-    endpoint: "https://api.deepseek.com/v1/chat/completions",
-    model: "deepseek-chat",
-  },
-  qwen: {
-    label: "Qwen / Alibaba DashScope",
-    apiStyle: "openai",
-    endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-    model: "qwen-plus",
-  },
-  groq: {
-    label: "Groq",
-    apiStyle: "openai",
-    endpoint: "https://api.groq.com/openai/v1/chat/completions",
-    model: "llama-3.3-70b-versatile",
-  },
-  gemini: {
-    label: "Google Gemini",
-    apiStyle: "openai",
-    endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    model: "gemini-2.5-flash",
-  },
-  anthropic: {
-    label: "Anthropic / Claude",
-    apiStyle: "anthropic",
-    endpoint: "https://api.anthropic.com/v1/messages",
-    model: "claude-3-5-haiku-latest",
-  },
-  siliconflow: {
-    label: "SiliconFlow",
-    apiStyle: "openai",
-    endpoint: "https://api.siliconflow.com/v1/chat/completions",
-    model: "Qwen/Qwen3-8B",
-  },
-  custom: {
-    label: "Custom",
-    apiStyle: "openai",
-    endpoint: "",
-    model: "",
-  },
-};
+const PROVIDER_PRESETS = globalThis.LocaleLensProviderPresets;
 
 const MARKET_LABELS = {
   US: "United States / English",
@@ -101,7 +36,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "GET_PROVIDER_PRESETS") {
-    sendResponse({ ok: true, data: PROVIDER_PRESETS });
+    sendResponse({ ok: true, data: globalThis.getLocaleLensVisibleProviderPresets() });
     return false;
   }
 
@@ -632,19 +567,78 @@ function redactSettings(settings) {
 }
 
 function normalizeError(error) {
-  return error?.message || String(error || "Unknown error");
+  const message = error?.message || String(error || "Unknown error");
+  return humanizeErrorMessage(message);
 }
 
 function throwProviderRequestError(settings, status, body) {
   const providerName = PROVIDER_PRESETS[settings.provider]?.label || settings.provider;
-  const hint = [
-    `Provider: ${providerName}`,
-    `API Style: ${settings.apiStyle}`,
-    `Endpoint: ${settings.endpoint}`,
-    `Model: ${settings.model}`,
-  ].join(" | ");
+  const providerBody = extractProviderErrorBody(body);
+  const hint = `当前配置：${providerName} / ${settings.model} / ${settings.apiStyle}`;
+  let message = "";
 
-  throw new Error(`AI request failed (${status}): ${body.slice(0, 240)}\n${hint}`);
+  if (status === 401 || status === 403) {
+    message = `API Key 验证失败。请检查 ${providerName} 的 API Key 是否复制完整、是否有权限，不要带 Bearer 前缀。`;
+  } else if (status === 429) {
+    message = "请求太频繁或额度不足。请稍后重试，或检查服务商账户余额和限额。";
+  } else if (status === 404) {
+    message = "接口地址或模型名称可能不对。请检查 Endpoint 和 Model。";
+  } else if (status >= 400 && status < 500) {
+    message = "服务商没有接受当前请求。请检查 Provider、API Style、Endpoint 和 Model 是否匹配。";
+  } else if (status >= 500) {
+    message = "服务商接口暂时不可用。请稍后重试，或临时切换到其他 Provider。";
+  } else {
+    message = `AI 请求失败 (${status})。`;
+  }
+
+  throw new Error(`${message}\n${hint}${providerBody ? `\n服务商返回：${providerBody}` : ""}`);
+}
+
+function humanizeErrorMessage(message) {
+  const text = String(message || "").trim();
+  if (!text) return "模型没有返回可用内容，请稍后重试。";
+  if (/401|403|invalid api key|authorized_error|unauthorized/i.test(text)) {
+    return "API Key 验证失败。请检查当前 Provider 的 API Key 是否完整、是否有权限，不要带 Bearer 前缀。";
+  }
+  if (/429|rate limit|quota|insufficient|balance|billing/i.test(text)) {
+    return "请求太频繁或额度不足。请稍后重试，或检查服务商账户余额和限额。";
+  }
+  if (/404|not found/i.test(text)) {
+    return "接口地址或模型名称可能不对。请打开配置页检查 Endpoint 和 Model。";
+  }
+  if (/400|bad request|invalid request/i.test(text)) {
+    return "服务商没有接受当前请求。请检查 Provider、API Style、Endpoint 和 Model 是否匹配。";
+  }
+  if (/not valid JSON|Expected ','|Unexpected token|Unexpected end/i.test(text)) {
+    return "模型回复的 JSON 格式不完整。可以点“重试”，或换一个更稳定的模型再试。";
+  }
+  if (/Failed to fetch|NetworkError|Load failed/i.test(text)) {
+    return "网络请求没有发出去。请检查网络、服务商 Endpoint，或稍后重试。";
+  }
+  if (/Missing product title/i.test(text)) {
+    return "没有读到商品标题。请刷新 Amazon 页面后再试。";
+  }
+  if (/API Key is not configured|请先填写 API Key/i.test(text)) {
+    return "还没有配置 API Key。请点击插件图标保存配置后再分析。";
+  }
+  return text.split("\n")[0].slice(0, 220);
+}
+
+function extractProviderErrorBody(body) {
+  const text = String(body || "").trim();
+  if (!text) return "";
+
+  try {
+    const json = JSON.parse(text);
+    return String(
+      json?.error?.message
+      || json?.message
+      || json?.error
+      || "",
+    ).slice(0, 180);
+  } catch (_error) {
+    return text.replace(/\s+/g, " ").slice(0, 180);
+  }
 }
 
 function normalizeApiKey(value) {

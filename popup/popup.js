@@ -16,7 +16,7 @@ let providerConfigs = {};
 init();
 
 async function init() {
-  providerPresets = await loadProviderPresets();
+  providerPresets = loadProviderPresets();
   renderProviderOptions(providerPresets);
 
   const settings = await chrome.storage.sync.get({
@@ -31,10 +31,11 @@ async function init() {
   });
   providerConfigs = isPlainObject(settings.providerConfigs) ? settings.providerConfigs : {};
 
-  providerInput.value = settings.provider || "minimax";
-  const activeConfig = getSavedConfig(providerInput.value, settings);
-  applyProviderConfig(providerInput.value, activeConfig);
-  advancedConfig.open = shouldShowAdvanced(providerInput.value, activeConfig);
+  const activeProvider = providerPresets[settings.provider] ? settings.provider : "minimax";
+  providerInput.value = activeProvider;
+  const activeConfig = getSavedConfig(activeProvider, settings);
+  applyProviderConfig(activeProvider, activeConfig);
+  advancedConfig.open = shouldShowAdvanced(activeProvider, activeConfig);
 
   if (activeConfig.apiKey) {
     statusNode.textContent = "API 已配置。去 Amazon 页面刷新后使用。";
@@ -45,23 +46,8 @@ async function init() {
   }
 }
 
-async function loadProviderPresets() {
-  const response = await chrome.runtime.sendMessage({ type: "GET_PROVIDER_PRESETS" });
-  if (response?.ok) return response.data;
-  return {
-    minimax: {
-      label: "MiniMax",
-      apiStyle: "anthropic-bearer",
-      endpoint: "https://api.minimaxi.com/anthropic/v1/messages",
-      model: "MiniMax-M2.7",
-    },
-    custom: {
-      label: "Custom",
-      apiStyle: "openai",
-      endpoint: "",
-      model: "",
-    },
-  };
+function loadProviderPresets() {
+  return globalThis.getLocaleLensVisibleProviderPresets();
 }
 
 function renderProviderOptions(presets) {

@@ -2,6 +2,7 @@ const CARD_SELECTOR = '[data-component-type="s-search-result"]';
 const MODULE_CLASS = 'gks-keyword-module';
 const PROCESSED_ATTR = 'data-gks-processed';
 const ACTIVE_BADGE_ID = 'gks-active-badge';
+const SHOW_ACTIVE_BADGE = false;
 const MARKET_SEARCH_HOSTS = {
   US: 'www.amazon.com',
   UK: 'www.amazon.co.uk',
@@ -127,8 +128,12 @@ function ensureKeywordModule(anchor) {
         <div class="gks-eyebrow">LocaleLens AI Terms</div>
         <div class="gks-subtitle">从标题提取核心词，再翻译成本地搜索表达</div>
       </div>
-      <button class="gks-collapse-button" type="button" data-gks-collapse>收起</button>
+      <div class="gks-header-actions">
+        <span class="gks-copy-hint">点关键词复制</span>
+        <button class="gks-collapse-button" type="button" data-gks-collapse>收起</button>
+      </div>
     </div>
+    <div class="gks-toast" aria-live="polite"></div>
     <div class="gks-body">
       ${renderLoading()}
     </div>
@@ -177,6 +182,10 @@ function setAnalyzeButtonsDisabled(disabled) {
 }
 
 function updateActiveBadge(count) {
+  if (!SHOW_ACTIVE_BADGE) {
+    document.getElementById(ACTIVE_BADGE_ID)?.remove();
+    return;
+  }
   let badge = document.getElementById(ACTIVE_BADGE_ID);
   if (!badge) {
     badge = document.createElement('div');
@@ -223,9 +232,9 @@ function renderCoreTerm(item) {
   }[item.role] || '词';
 
   return `
-    <span class="gks-chip" title="${escapeHtml(item.reason || '')}">
+    <button class="gks-chip" type="button" data-gks-copy-term="${escapeHtml(item.term)}" title="${escapeHtml(item.reason || '点击复制关键词')}">
       <b>${role}</b>${escapeHtml(item.term)}
-    </span>
+    </button>
   `;
 }
 
@@ -251,11 +260,15 @@ function renderMarket(market) {
           ${tikTokSearchUrl ? `<a class="gks-open-link gks-tiktok-link" href="${escapeHtml(tikTokSearchUrl)}" target="_blank" rel="noopener noreferrer" title="打开 TikTok 搜索：${escapeHtml(searchTerm)}">TikTok</a>` : ''}
         </div>
       </div>
-      <div class="gks-term-line">${head.map((term) => `<span>${escapeHtml(term)}</span>`).join('')}</div>
-      <div class="gks-tail-line">${longTail.map((term) => `<span>${escapeHtml(term)}</span>`).join('')}</div>
+      <div class="gks-term-line">${head.map(renderCopyTerm).join('')}</div>
+      <div class="gks-tail-line">${longTail.map(renderCopyTerm).join('')}</div>
       ${market.localExpressionNotes ? `<p>${escapeHtml(market.localExpressionNotes)}</p>` : ''}
     </article>
   `;
+}
+
+function renderCopyTerm(term) {
+  return `<button type="button" data-gks-copy-term="${escapeHtml(term)}" title="点击复制关键词">${escapeHtml(term)}</button>`;
 }
 
 function renderResearchLinks(coreTerms) {
@@ -290,10 +303,11 @@ function renderResearchLinks(coreTerms) {
 }
 
 function renderError(error) {
+  const message = formatUserError(error?.message || String(error));
   return `
     <div class="gks-error">
       <b>无法完成 AI 分析</b>
-      <span>${escapeHtml(error?.message || String(error))}</span>
+      <span>${escapeHtml(message)}</span>
       <button class="gks-link-button" type="button" data-gks-open-options>打开配置页</button>
     </div>
   `;
@@ -311,6 +325,12 @@ document.addEventListener('click', (event) => {
     copyPostalCode(postalButton.dataset.gksCopyPostal, postalButton);
   }
 
+  const copyTerm = target?.closest?.('[data-gks-copy-term]');
+  if (copyTerm) {
+    event.preventDefault();
+    copyKeywordTerm(copyTerm.dataset.gksCopyTerm, copyTerm);
+  }
+
   const amazonLink = target?.closest?.('a[data-gks-postal-code]');
   if (amazonLink?.dataset?.gksPostalCode) {
     copyTextToClipboard(amazonLink.dataset.gksPostalCode);
@@ -323,6 +343,55 @@ document.addEventListener('click', (event) => {
     target.textContent = collapsed ? '展开' : '收起';
   }
 });
+
+async function copyKeywordTerm(term, node) {
+  const ok = await copyTextToClipboard(term);
+  const module = node.closest?.(`.${MODULE_CLASS}`);
+  if (ok) {
+    node.classList.add('gks-copied');
+    setTimeout(() => node.classList.remove('gks-copied'), 900);
+  }
+  showModuleToast(module, ok ? `已复制：${term}` : '复制失败，请手动选择文本');
+}
+
+function showModuleToast(module, message) {
+  const toast = module?.querySelector?.('.gks-toast');
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.classList.add('gks-toast-visible');
+  clearTimeout(toast.gksTimer);
+  toast.gksTimer = setTimeout(() => {
+    toast.classList.remove('gks-toast-visible');
+  }, 1400);
+}
+
+function formatUserError(message) {
+  const text = String(message || '').trim();
+  if (!text) return '模型没有返回可用内容，请稍后重试。';
+  if (/401|403|invalid api key|authorized_error|unauthorized/i.test(text)) {
+    return 'API Key 验证失败。请检查当前 Provider 的 API Key 是否完整、是否有权限，MiniMax 不要带 Bearer 前缀。';
+  }
+  if (/429|rate limit|quota|insufficient|balance|billing/i.test(text)) {
+    return '请求太频繁或额度不足。请稍后重试，或检查服务商账户余额和限额。';
+  }
+  if (/404|not found/i.test(text)) {
+    return '接口地址或模型名称可能不对。请打开配置页检查 Endpoint 和 Model。';
+  }
+  if (/400|bad request|invalid request/i.test(text)) {
+    return '服务商没有接受当前请求。请检查 Provider、API Style、Endpoint 和 Model 是否匹配。';
+  }
+  if (/not valid json|JSON|Expected ','|Unexpected/i.test(text)) {
+    return '模型回复的格式不完整。可以点“重试”，或换一个更稳定的模型再试。';
+  }
+  if (/failed to fetch|network|fetch/i.test(text)) {
+    return '网络请求没有发出去。请检查网络、服务商 Endpoint，或稍后重试。';
+  }
+  if (/API Key is not configured|请先填写 API Key/i.test(text)) {
+    return '还没有配置 API Key。请点击右上角插件图标保存配置后再分析。';
+  }
+  return text.split('\n')[0].slice(0, 180);
+}
 
 function detectMarketplace(hostname) {
   if (hostname.endsWith('amazon.de')) return 'DE';

@@ -22,12 +22,13 @@ let providerConfigs = {};
 init();
 
 async function init() {
-  providerPresets = await loadProviderPresets();
+  providerPresets = loadProviderPresets();
   renderProviderOptions(providerPresets);
   const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   providerConfigs = isPlainObject(settings.providerConfigs) ? settings.providerConfigs : {};
-  providerInput.value = settings.provider || DEFAULT_SETTINGS.provider;
-  applyProviderConfig(providerInput.value, getSavedConfig(providerInput.value, settings));
+  const activeProvider = providerPresets[settings.provider] ? settings.provider : DEFAULT_SETTINGS.provider;
+  providerInput.value = activeProvider;
+  applyProviderConfig(activeProvider, getSavedConfig(activeProvider, settings));
 
   const markets = new Set(settings.markets || DEFAULT_SETTINGS.markets);
   document.querySelectorAll('input[name="market"]').forEach((input) => {
@@ -35,23 +36,8 @@ async function init() {
   });
 }
 
-async function loadProviderPresets() {
-  const response = await chrome.runtime.sendMessage({ type: "GET_PROVIDER_PRESETS" });
-  if (response?.ok) return response.data;
-  return {
-    minimax: {
-      label: "MiniMax",
-      apiStyle: "anthropic-bearer",
-      endpoint: DEFAULT_SETTINGS.endpoint,
-      model: DEFAULT_SETTINGS.model,
-    },
-    custom: {
-      label: "Custom",
-      apiStyle: "openai",
-      endpoint: "",
-      model: "",
-    },
-  };
+function loadProviderPresets() {
+  return globalThis.getLocaleLensVisibleProviderPresets();
 }
 
 function renderProviderOptions(presets) {
