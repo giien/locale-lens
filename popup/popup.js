@@ -22,7 +22,7 @@ async function init() {
     endpoint: providerPresets.minimax.endpoint,
     model: providerPresets.minimax.model,
     apiKey: "",
-    temperature: 0.2,
+    temperature: 1,
     markets: ["US", "CN", "DE", "FR", "ES", "JP"],
   });
 
@@ -46,9 +46,9 @@ async function loadProviderPresets() {
   if (response?.ok) return response.data;
   return {
     minimax: {
-      label: "MiniMax",
+      label: "MiniMax OpenAI-compatible",
       apiStyle: "openai",
-      endpoint: "https://api.minimax.io/v1/chat/completions",
+      endpoint: "https://api.minimaxi.com/v1/chat/completions",
       model: "MiniMax-M2.7",
     },
     custom: {
@@ -82,7 +82,7 @@ form.addEventListener("submit", async (event) => {
     endpoint: endpointInput.value.trim(),
     model: modelInput.value.trim(),
     apiKey: normalizeApiKey(apiKeyInput.value),
-    temperature: 0.2,
+    temperature: 1,
     markets: ["US", "CN", "DE", "FR", "ES", "JP"],
   };
 

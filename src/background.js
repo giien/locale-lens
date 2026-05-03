@@ -1,18 +1,24 @@
 const DEFAULT_SETTINGS = {
   provider: "minimax",
   apiStyle: "openai",
-  endpoint: "https://api.minimax.io/v1/chat/completions",
+  endpoint: "https://api.minimaxi.com/v1/chat/completions",
   model: "MiniMax-M2.7",
   apiKey: "",
-  temperature: 0.2,
+  temperature: 1,
   markets: ["US", "CN", "DE", "FR", "ES", "JP"],
 };
 
 const PROVIDER_PRESETS = {
   minimax: {
-    label: "MiniMax",
+    label: "MiniMax OpenAI-compatible",
     apiStyle: "openai",
-    endpoint: "https://api.minimax.io/v1/chat/completions",
+    endpoint: "https://api.minimaxi.com/v1/chat/completions",
+    model: "MiniMax-M2.7",
+  },
+  minimaxAnthropic: {
+    label: "MiniMax Anthropic-compatible",
+    apiStyle: "anthropic-bearer",
+    endpoint: "https://api.minimaxi.com/anthropic/v1/messages",
     model: "MiniMax-M2.7",
   },
   openai: {
@@ -142,7 +148,8 @@ async function analyzeTitle(payload) {
 }
 
 async function callConfiguredProvider(settings, context) {
-  if ((settings.apiStyle || "openai") === "anthropic") {
+  const apiStyle = settings.apiStyle || "openai";
+  if (apiStyle === "anthropic" || apiStyle === "anthropic-bearer") {
     return callAnthropicMessages(settings, context);
   }
 
@@ -202,21 +209,7 @@ async function callOpenAICompatible(settings, context) {
   const response = await fetch(settings.endpoint, {
     method: "POST",
     headers: buildOpenAICompatibleHeaders(settings.provider, apiKey),
-    body: JSON.stringify({
-      model: settings.model,
-      temperature: Number(settings.temperature ?? 0.2),
-      messages: [
-        {
-          role: "system",
-          content: "You produce compact, valid JSON for ecommerce keyword localization.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: { type: "json_object" },
-    }),
+    body: JSON.stringify(buildOpenAICompatibleBody(settings, prompt)),
   });
 
   const body = await response.text();
@@ -240,15 +233,11 @@ async function callAnthropicMessages(settings, context) {
 
   const response = await fetch(settings.endpoint, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
+    headers: buildAnthropicHeaders(settings.apiStyle, apiKey),
     body: JSON.stringify({
       model: settings.model,
       max_tokens: 1600,
-      temperature: Number(settings.temperature ?? 0.2),
+      temperature: Number(settings.temperature ?? 1),
       system: "You produce compact, valid JSON for ecommerce keyword localization.",
       messages: [
         {
@@ -274,10 +263,27 @@ async function callAnthropicMessages(settings, context) {
   return normalizeAnalysis(parsed, context.title);
 }
 
+function buildOpenAICompatibleBody(settings, prompt) {
+  return {
+    model: settings.model,
+    temperature: Number(settings.temperature ?? 1),
+    messages: [
+      {
+        role: "system",
+        content: "You produce compact, valid JSON for ecommerce keyword localization.",
+      },
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  };
+}
+
 function buildOpenAICompatibleHeaders(provider, apiKey) {
   const headers = {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+    "Authorization": `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
   };
 
   if (provider === "openrouter") {
@@ -286,6 +292,21 @@ function buildOpenAICompatibleHeaders(provider, apiKey) {
   }
 
   return headers;
+}
+
+function buildAnthropicHeaders(apiStyle, apiKey) {
+  if (apiStyle === "anthropic-bearer") {
+    return {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+  }
+
+  return {
+    "x-api-key": apiKey,
+    "anthropic-version": "2023-06-01",
+    "Content-Type": "application/json",
+  };
 }
 
 function extractOpenAICompatibleContent(payload) {
@@ -405,7 +426,8 @@ function validateHeaderSafeApiKey(apiKey) {
 
 function clamp(value, min, max) {
   if (Number.isNaN(value)) return DEFAULT_SETTINGS.temperature;
-  return Math.min(max, Math.max(min, value));
+  const clamped = Math.min(max, Math.max(min, value));
+  return clamped === 0 ? DEFAULT_SETTINGS.temperature : clamped;
 }
 
 function hashText(text) {

@@ -29,6 +29,7 @@ Clicking the extension icon opens a small popup where you can configure a model 
 LocaleLens includes presets for:
 
 - MiniMax
+- MiniMax Anthropic-compatible
 - OpenAI
 - OpenRouter
 - DeepSeek
@@ -39,11 +40,12 @@ LocaleLens includes presets for:
 - SiliconFlow
 - Custom OpenAI-compatible or Anthropic-style endpoint
 
-Most providers use the OpenAI-compatible `chat/completions` format. Anthropic uses the native Messages API format.
+Most providers use the OpenAI-compatible `chat/completions` format. Anthropic uses the native Messages API format. MiniMax also provides an Anthropic-compatible endpoint using Bearer authentication.
 
 ## MiniMax defaults
 
-- Endpoint: `https://api.minimax.io/v1/chat/completions`
+- Endpoint: `https://api.minimaxi.com/v1/chat/completions`
+- Anthropic-compatible endpoint: `https://api.minimaxi.com/anthropic/v1/messages`
 - Model: `MiniMax-M2.7`
 
-MiniMax currently supports OpenAI-compatible chat completions at `/v1/chat/completions`.
+MiniMax supports OpenAI-compatible chat completions at `/v1/chat/completions` and recommends Anthropic-compatible access in its AI SDK provider docs.
