@@ -1,5 +1,6 @@
 const DEFAULT_SETTINGS = {
   provider: "minimax",
+  providerConfigs: {},
   apiStyle: "openai",
   endpoint: "https://api.minimaxi.com/v1/chat/completions",
   model: "MiniMax-M2.7",
@@ -367,13 +368,18 @@ function toStringList(value) {
 async function getSettings() {
   const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   const preset = PROVIDER_PRESETS[stored.provider] || PROVIDER_PRESETS.minimax;
+  const providerConfig = getProviderConfig(stored.provider, stored.providerConfigs, stored);
+
   return {
     ...DEFAULT_SETTINGS,
     ...preset,
     ...stored,
-    apiStyle: stored.apiStyle || preset.apiStyle || DEFAULT_SETTINGS.apiStyle,
-    endpoint: stored.endpoint || preset.endpoint || DEFAULT_SETTINGS.endpoint,
-    model: stored.model || preset.model || DEFAULT_SETTINGS.model,
+    ...providerConfig,
+    apiStyle: providerConfig.apiStyle || preset.apiStyle || DEFAULT_SETTINGS.apiStyle,
+    endpoint: providerConfig.endpoint || preset.endpoint || DEFAULT_SETTINGS.endpoint,
+    model: providerConfig.model || preset.model || DEFAULT_SETTINGS.model,
+    apiKey: providerConfig.apiKey || "",
+    temperature: providerConfig.temperature ?? stored.temperature ?? DEFAULT_SETTINGS.temperature,
     markets: Array.isArray(stored.markets) && stored.markets.length ? stored.markets : DEFAULT_SETTINGS.markets,
   };
 }
@@ -383,25 +389,49 @@ async function saveSettings(payload) {
   if (apiKey) validateHeaderSafeApiKey(apiKey);
   const provider = String(payload?.provider || DEFAULT_SETTINGS.provider).trim();
   const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.custom;
+  const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  const providerConfigs = {
+    ...(isPlainObject(stored.providerConfigs) ? stored.providerConfigs : {}),
+  };
 
-  const settings = {
-    provider,
+  const providerConfig = {
     apiStyle: String(payload?.apiStyle || preset.apiStyle || "openai").trim(),
     endpoint: String(payload?.endpoint || preset.endpoint || DEFAULT_SETTINGS.endpoint).trim(),
     model: String(payload?.model || preset.model || DEFAULT_SETTINGS.model).trim(),
     apiKey,
     temperature: clamp(Number(payload?.temperature ?? DEFAULT_SETTINGS.temperature), 0, 1),
+  };
+
+  providerConfigs[provider] = providerConfig;
+
+  const settings = {
+    provider,
+    providerConfigs,
+    ...providerConfig,
     markets: Array.isArray(payload?.markets) && payload.markets.length ? payload.markets : DEFAULT_SETTINGS.markets,
   };
+
   await chrome.storage.sync.set(settings);
   return settings;
 }
 
 function redactSettings(settings) {
+  const providerConfigs = Object.fromEntries(
+    Object.entries(settings.providerConfigs || {}).map(([provider, config]) => [
+      provider,
+      {
+        ...config,
+        apiKey: config?.apiKey ? "********" : "",
+        hasApiKey: Boolean(config?.apiKey),
+      },
+    ]),
+  );
+
   return {
     ...settings,
     apiKey: settings.apiKey ? "********" : "",
     hasApiKey: Boolean(settings.apiKey),
+    providerConfigs,
   };
 }
 
@@ -416,6 +446,28 @@ function normalizeApiKey(value) {
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .replace(/\s+/g, "")
     .trim();
+}
+
+function getProviderConfig(provider, providerConfigs, stored) {
+  if (isPlainObject(providerConfigs) && isPlainObject(providerConfigs[provider])) {
+    return providerConfigs[provider];
+  }
+
+  if (provider === stored.provider) {
+    return {
+      apiStyle: stored.apiStyle,
+      endpoint: stored.endpoint,
+      model: stored.model,
+      apiKey: stored.apiKey,
+      temperature: stored.temperature,
+    };
+  }
+
+  return {};
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function validateHeaderSafeApiKey(apiKey) {

@@ -1,5 +1,6 @@
 const DEFAULT_SETTINGS = {
   provider: "minimax",
+  providerConfigs: {},
   apiStyle: "openai",
   endpoint: "https://api.minimaxi.com/v1/chat/completions",
   model: "MiniMax-M2.7",
@@ -16,6 +17,7 @@ const endpointInput = document.querySelector("#endpoint");
 const modelInput = document.querySelector("#model");
 const apiKeyInput = document.querySelector("#apiKey");
 let providerPresets = {};
+let providerConfigs = {};
 
 init();
 
@@ -23,12 +25,9 @@ async function init() {
   providerPresets = await loadProviderPresets();
   renderProviderOptions(providerPresets);
   const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  providerConfigs = isPlainObject(settings.providerConfigs) ? settings.providerConfigs : {};
   providerInput.value = settings.provider || DEFAULT_SETTINGS.provider;
-  apiStyleInput.value = settings.apiStyle || getPreset(providerInput.value).apiStyle || DEFAULT_SETTINGS.apiStyle;
-  endpointInput.value = settings.endpoint || getPreset(providerInput.value).endpoint || DEFAULT_SETTINGS.endpoint;
-  modelInput.value = settings.model || getPreset(providerInput.value).model || DEFAULT_SETTINGS.model;
-  document.querySelector("#temperature").value = settings.temperature ?? DEFAULT_SETTINGS.temperature;
-  apiKeyInput.value = settings.apiKey || "";
+  applyProviderConfig(providerInput.value, getSavedConfig(providerInput.value, settings));
 
   const markets = new Set(settings.markets || DEFAULT_SETTINGS.markets);
   document.querySelectorAll('input[name="market"]').forEach((input) => {
@@ -62,10 +61,7 @@ function renderProviderOptions(presets) {
 }
 
 providerInput.addEventListener("change", () => {
-  const preset = getPreset(providerInput.value);
-  apiStyleInput.value = preset.apiStyle || "openai";
-  endpointInput.value = preset.endpoint || "";
-  modelInput.value = preset.model || "";
+  applyProviderConfig(providerInput.value, getSavedConfig(providerInput.value));
 });
 
 form.addEventListener("submit", async (event) => {
@@ -88,6 +84,10 @@ form.addEventListener("submit", async (event) => {
 
   if (response?.ok) {
     apiKeyInput.value = payload.apiKey;
+    providerConfigs = response.data.providerConfigs || {
+      ...providerConfigs,
+      [providerInput.value]: { ...payload },
+    };
     statusNode.textContent = "已保存。回到 Amazon 页面后刷新一次即可使用。";
   } else {
     statusNode.textContent = response?.error || "保存失败。";
@@ -99,6 +99,42 @@ form.addEventListener("submit", async (event) => {
 
 function getPreset(provider) {
   return providerPresets[provider] || providerPresets.custom || {};
+}
+
+function getSavedConfig(provider, fallbackSettings = {}) {
+  const preset = getPreset(provider);
+  const saved = isPlainObject(providerConfigs[provider]) ? providerConfigs[provider] : {};
+
+  if (provider === fallbackSettings.provider && !Object.keys(saved).length) {
+    return {
+      apiStyle: fallbackSettings.apiStyle,
+      endpoint: fallbackSettings.endpoint,
+      model: fallbackSettings.model,
+      apiKey: fallbackSettings.apiKey,
+      temperature: fallbackSettings.temperature,
+    };
+  }
+
+  return {
+    apiStyle: saved.apiStyle || preset.apiStyle || "openai",
+    endpoint: saved.endpoint || preset.endpoint || "",
+    model: saved.model || preset.model || "",
+    apiKey: saved.apiKey || "",
+    temperature: saved.temperature ?? DEFAULT_SETTINGS.temperature,
+  };
+}
+
+function applyProviderConfig(provider, config = {}) {
+  const preset = getPreset(provider);
+  apiStyleInput.value = config.apiStyle || preset.apiStyle || "openai";
+  endpointInput.value = config.endpoint || preset.endpoint || "";
+  modelInput.value = config.model || preset.model || "";
+  apiKeyInput.value = config.apiKey || "";
+  document.querySelector("#temperature").value = config.temperature ?? DEFAULT_SETTINGS.temperature;
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function normalizeApiKey(value) {

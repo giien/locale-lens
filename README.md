@@ -23,6 +23,7 @@ Chrome Manifest V3 prototype for Amazon cross-market keyword research.
 6. Refresh an Amazon search page and click `AI 分析` below a product title.
 
 Clicking the extension icon opens a small popup where you can configure a model provider.
+Each provider keeps its own endpoint, model, API style, and API key, so switching providers will restore that provider's saved configuration instead of reusing another provider's key.
 
 ## Model providers
 

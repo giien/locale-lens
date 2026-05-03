@@ -9,6 +9,7 @@ const openOptionsButton = document.querySelector("#open-options");
 const openAmazonButton = document.querySelector("#open-amazon");
 
 let providerPresets = {};
+let providerConfigs = {};
 
 init();
 
@@ -18,6 +19,7 @@ async function init() {
 
   const settings = await chrome.storage.sync.get({
     provider: "minimax",
+    providerConfigs: {},
     apiStyle: "openai",
     endpoint: providerPresets.minimax.endpoint,
     model: providerPresets.minimax.model,
@@ -25,14 +27,13 @@ async function init() {
     temperature: 1,
     markets: ["US", "CN", "DE", "FR", "ES", "JP"],
   });
+  providerConfigs = isPlainObject(settings.providerConfigs) ? settings.providerConfigs : {};
 
   providerInput.value = settings.provider || "minimax";
-  apiStyleInput.value = settings.apiStyle || getPreset(providerInput.value).apiStyle || "openai";
-  endpointInput.value = settings.endpoint || getPreset(providerInput.value).endpoint || "";
-  modelInput.value = settings.model || getPreset(providerInput.value).model || "";
-  apiKeyInput.value = settings.apiKey || "";
+  const activeConfig = getSavedConfig(providerInput.value, settings);
+  applyProviderConfig(providerInput.value, activeConfig);
 
-  if (settings.apiKey) {
+  if (activeConfig.apiKey) {
     statusNode.textContent = "API 已配置。去 Amazon 页面刷新后使用。";
     statusNode.className = "ready";
   } else {
@@ -67,17 +68,14 @@ function renderProviderOptions(presets) {
 }
 
 providerInput.addEventListener("change", () => {
-  const preset = getPreset(providerInput.value);
-  if (!preset) return;
-  apiStyleInput.value = preset.apiStyle || "openai";
-  endpointInput.value = preset.endpoint || "";
-  modelInput.value = preset.model || "";
+  applyProviderConfig(providerInput.value, getSavedConfig(providerInput.value));
 });
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const provider = providerInput.value;
   const payload = {
-    provider: providerInput.value,
+    provider,
     apiStyle: apiStyleInput.value,
     endpoint: endpointInput.value.trim(),
     model: modelInput.value.trim(),
@@ -93,6 +91,10 @@ form.addEventListener("submit", async (event) => {
 
   if (response?.ok) {
     apiKeyInput.value = payload.apiKey;
+    providerConfigs = response.data.providerConfigs || {
+      ...providerConfigs,
+      [provider]: { ...payload },
+    };
     statusNode.textContent = "已保存。刷新 Amazon 页面后使用。";
     statusNode.className = "ready";
   } else {
@@ -103,6 +105,39 @@ form.addEventListener("submit", async (event) => {
 
 function getPreset(provider) {
   return providerPresets[provider] || providerPresets.custom || {};
+}
+
+function getSavedConfig(provider, fallbackSettings = {}) {
+  const preset = getPreset(provider);
+  const saved = isPlainObject(providerConfigs[provider]) ? providerConfigs[provider] : {};
+
+  if (provider === fallbackSettings.provider && !Object.keys(saved).length) {
+    return {
+      apiStyle: fallbackSettings.apiStyle,
+      endpoint: fallbackSettings.endpoint,
+      model: fallbackSettings.model,
+      apiKey: fallbackSettings.apiKey,
+    };
+  }
+
+  return {
+    apiStyle: saved.apiStyle || preset.apiStyle || "openai",
+    endpoint: saved.endpoint || preset.endpoint || "",
+    model: saved.model || preset.model || "",
+    apiKey: saved.apiKey || "",
+  };
+}
+
+function applyProviderConfig(provider, config = {}) {
+  const preset = getPreset(provider);
+  apiStyleInput.value = config.apiStyle || preset.apiStyle || "openai";
+  endpointInput.value = config.endpoint || preset.endpoint || "";
+  modelInput.value = config.model || preset.model || "";
+  apiKeyInput.value = config.apiKey || "";
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function normalizeApiKey(value) {
