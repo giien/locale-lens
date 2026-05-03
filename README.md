@@ -11,6 +11,7 @@ Chrome Manifest V3 prototype for Amazon cross-market keyword research.
 - Adds an `打开` link for supported Amazon marketplaces, opening the localized head term on the target Amazon search URL.
 - Adds compact collapse/expand controls for the analysis module.
 - Adds TikTok Search, TikTok hashtag, and Google Trends exploration links for fast product-development validation.
+- Generates default market postal codes and copies them when opening target Amazon marketplace URLs.
 
 ## Local install
 

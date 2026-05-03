@@ -11,6 +11,16 @@ const MARKET_SEARCH_HOSTS = {
   IT: 'www.amazon.it',
   JP: 'www.amazon.co.jp',
 };
+const MARKET_POSTAL_CODES = {
+  US: { code: '10001', place: 'New York' },
+  UK: { code: 'SW1A 1AA', place: 'London' },
+  DE: { code: '10115', place: 'Berlin' },
+  FR: { code: '75001', place: 'Paris' },
+  ES: { code: '28001', place: 'Madrid' },
+  IT: { code: '00118', place: 'Rome' },
+  JP: { code: '100-0001', place: 'Tokyo' },
+  CN: { code: '100000', place: 'Beijing' },
+};
 
 let scanTimer = 0;
 let analysisInFlight = false;
@@ -226,6 +236,7 @@ function renderMarket(market) {
   const searchTerm = head[0] || longTail[0] || '';
   const searchUrl = buildAmazonSearchUrl(marketCode, searchTerm);
   const tikTokSearchUrl = buildTikTokSearchUrl(searchTerm);
+  const postal = getPostalCodeForMarket(marketCode);
 
   return `
     <article class="gks-market">
@@ -235,7 +246,8 @@ function renderMarket(market) {
           <span>${escapeHtml(market.language || '')}</span>
         </div>
         <div class="gks-market-actions">
-          ${searchUrl ? `<a class="gks-open-link" href="${escapeHtml(searchUrl)}" target="_blank" rel="noopener noreferrer" title="打开 ${escapeHtml(searchTerm)} 的 ${escapeHtml(marketCode)} Amazon 搜索页">Amazon</a>` : ''}
+          ${postal ? `<button class="gks-postal-button" type="button" data-gks-copy-postal="${escapeHtml(postal.code)}" title="复制 ${escapeHtml(marketCode)} 默认邮编：${escapeHtml(postal.place)}">${escapeHtml(postal.code)}</button>` : ''}
+          ${searchUrl ? `<a class="gks-open-link" href="${escapeHtml(searchUrl)}" target="_blank" rel="noopener noreferrer" data-gks-postal-code="${escapeHtml(postal?.code || '')}" title="打开 ${escapeHtml(searchTerm)} 的 ${escapeHtml(marketCode)} Amazon 搜索页。若需要邮编，会自动复制 ${escapeHtml(postal?.code || '')}">Amazon</a>` : ''}
           ${tikTokSearchUrl ? `<a class="gks-open-link gks-tiktok-link" href="${escapeHtml(tikTokSearchUrl)}" target="_blank" rel="noopener noreferrer" title="打开 TikTok 搜索：${escapeHtml(searchTerm)}">TikTok</a>` : ''}
         </div>
       </div>
@@ -293,6 +305,17 @@ document.addEventListener('click', (event) => {
     chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' });
   }
 
+  const postalButton = target?.closest?.('[data-gks-copy-postal]');
+  if (postalButton) {
+    event.preventDefault();
+    copyPostalCode(postalButton.dataset.gksCopyPostal, postalButton);
+  }
+
+  const amazonLink = target?.closest?.('a[data-gks-postal-code]');
+  if (amazonLink?.dataset?.gksPostalCode) {
+    copyTextToClipboard(amazonLink.dataset.gksPostalCode);
+  }
+
   if (target?.matches?.('[data-gks-collapse]')) {
     const module = target.closest(`.${MODULE_CLASS}`);
     if (!module) return;
@@ -330,6 +353,44 @@ function buildAmazonSearchUrl(marketCode, searchTerm) {
   const url = new URL(`https://${host}/s`);
   url.searchParams.set('k', term);
   return url.toString();
+}
+
+function getPostalCodeForMarket(marketCode) {
+  return MARKET_POSTAL_CODES[marketCode] || null;
+}
+
+async function copyPostalCode(postalCode, button) {
+  const ok = await copyTextToClipboard(postalCode);
+  const oldText = button.textContent;
+  button.textContent = ok ? '已复制' : postalCode;
+  setTimeout(() => {
+    button.textContent = oldText;
+  }, 1200);
+}
+
+async function copyTextToClipboard(text) {
+  const value = String(text || '').trim();
+  if (!value) return false;
+
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch (_error) {
+    return fallbackCopyText(value);
+  }
+}
+
+function fallbackCopyText(text) {
+  const input = document.createElement('textarea');
+  input.value = text;
+  input.setAttribute('readonly', 'true');
+  input.style.position = 'fixed';
+  input.style.left = '-9999px';
+  document.body.appendChild(input);
+  input.select();
+  const ok = document.execCommand('copy');
+  input.remove();
+  return ok;
 }
 
 function buildTikTokSearchUrl(searchTerm) {

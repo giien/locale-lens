@@ -253,6 +253,23 @@
   text-decoration: none !important;
 }
 
+.gks-postal-button {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 5px;
+  color: #9a3412;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px 6px;
+}
+
+.gks-postal-button:hover {
+  background: #ffedd5;
+}
+
 .gks-open-link:hover {
   background: #1d4ed8;
 }
