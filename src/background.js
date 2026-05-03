@@ -385,14 +385,18 @@ async function getSettings() {
 }
 
 async function saveSettings(payload) {
-  const apiKey = normalizeApiKey(payload?.apiKey || "");
-  if (apiKey) validateHeaderSafeApiKey(apiKey);
   const provider = String(payload?.provider || DEFAULT_SETTINGS.provider).trim();
   const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.custom;
   const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   const providerConfigs = {
     ...(isPlainObject(stored.providerConfigs) ? stored.providerConfigs : {}),
   };
+  const previousConfig = isPlainObject(providerConfigs[provider]) ? providerConfigs[provider] : {};
+  let apiKey = normalizeApiKey(payload?.apiKey || "");
+  if (apiKey === "********" && previousConfig.apiKey) {
+    apiKey = previousConfig.apiKey;
+  }
+  if (apiKey) validateHeaderSafeApiKey(apiKey);
 
   const providerConfig = {
     apiStyle: String(payload?.apiStyle || preset.apiStyle || "openai").trim(),

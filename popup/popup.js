@@ -91,9 +91,15 @@ form.addEventListener("submit", async (event) => {
 
   if (response?.ok) {
     apiKeyInput.value = payload.apiKey;
-    providerConfigs = response.data.providerConfigs || {
+    providerConfigs = {
       ...providerConfigs,
-      [provider]: { ...payload },
+      [provider]: {
+        apiStyle: payload.apiStyle,
+        endpoint: payload.endpoint,
+        model: payload.model,
+        apiKey: payload.apiKey,
+        temperature: payload.temperature,
+      },
     };
     statusNode.textContent = "已保存。刷新 Amazon 页面后使用。";
     statusNode.className = "ready";
