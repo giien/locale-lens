@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Global Keyword Scout",
+  "version": "0.1.0",
+  "description": "AI keyword localization assistant for Amazon and cross-market product research.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.amazon.com/*",
+    "https://www.amazon.co.uk/*",
+    "https://www.amazon.de/*",
+    "https://www.amazon.fr/*",
+    "https://www.amazon.es/*",
+    "https://www.amazon.it/*",
+    "https://www.amazon.co.jp/*",
+    "https://api.minimax.io/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.amazon.com/*",
+        "https://www.amazon.co.uk/*",
+        "https://www.amazon.de/*",
+        "https://www.amazon.fr/*",
+        "https://www.amazon.es/*",
+        "https://www.amazon.it/*",
+        "https://www.amazon.co.jp/*"
+      ],
+      "js": ["src/content.js"],
+      "css": ["src/styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options/options.html",
+  "action": {
+    "default_title": "Global Keyword Scout",
+    "default_popup": "popup/popup.html"
+  }
+}

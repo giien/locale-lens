@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Global Keyword Scout</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <header>
+        <h1>Global Keyword Scout</h1>
+        <p id="status">正在读取配置...</p>
+      </header>
+
+      <form id="api-form" class="panel">
+        <label>
+          <span>Provider</span>
+          <select id="provider">
+            <option value="minimax">MiniMax</option>
+            <option value="custom">自定义 OpenAI-compatible</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Endpoint</span>
+          <input id="endpoint" type="url" autocomplete="off">
+        </label>
+
+        <label>
+          <span>Model</span>
+          <input id="model" type="text" autocomplete="off">
+        </label>
+
+        <label>
+          <span>API Key</span>
+          <input id="apiKey" type="password" autocomplete="off" placeholder="sk-...">
+        </label>
+
+        <button id="save" type="submit">保存配置</button>
+      </form>
+
+      <section class="usage">
+        <h2>使用</h2>
+        <p>保存后刷新 Amazon 搜索页，在商品标题下方点击 AI 分析。</p>
+      </section>
+
+      <div class="actions">
+        <button id="open-options" type="button">高级配置</button>
+        <button id="open-amazon" type="button">打开 Amazon</button>
+      </div>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

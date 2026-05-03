@@ -1,0 +1,106 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: #172033;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  width: 360px;
+}
+
+.popup {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+h1 {
+  font-size: 18px;
+  margin: 0 0 6px;
+}
+
+h2 {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+p,
+li {
+  color: #526173;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+p {
+  margin: 0;
+}
+
+.panel {
+  display: grid;
+  gap: 10px;
+}
+
+label {
+  display: grid;
+  gap: 5px;
+}
+
+label span {
+  color: #344256;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+input,
+select {
+  border: 1px solid #c9d6e3;
+  border-radius: 6px;
+  font-size: 12px;
+  height: 34px;
+  padding: 7px 9px;
+  width: 100%;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 10px;
+}
+
+#save {
+  background: #2563eb;
+  color: #fff;
+  width: 100%;
+}
+
+#open-options {
+  background: #2563eb;
+  color: #fff;
+}
+
+#open-amazon {
+  background: #eef2f7;
+  color: #172033;
+}
+
+.ready {
+  color: #0f766e;
+}
+
+.missing {
+  color: #991b1b;
+}
+
+.usage {
+  border-top: 1px solid #e5eaf1;
+  padding-top: 12px;
+}
