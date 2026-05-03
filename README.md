@@ -19,10 +19,27 @@ Chrome Manifest V3 prototype for Amazon cross-market keyword research.
 
    `/Volumes/Rtl9210/globaltrans/global-keyword-extension`
 
-5. Open the extension options page and save your MiniMax API key.
+5. Click the extension icon or open the extension options page and save your model provider API key.
 6. Refresh an Amazon search page and click `AI 分析` below a product title.
 
-Clicking the extension icon opens a small popup where you can configure MiniMax or a custom OpenAI-compatible API.
+Clicking the extension icon opens a small popup where you can configure a model provider.
+
+## Model providers
+
+LocaleLens includes presets for:
+
+- MiniMax
+- OpenAI
+- OpenRouter
+- DeepSeek
+- Qwen / Alibaba DashScope
+- Groq
+- Google Gemini OpenAI-compatible endpoint
+- Anthropic / Claude Messages API
+- SiliconFlow
+- Custom OpenAI-compatible or Anthropic-style endpoint
+
+Most providers use the OpenAI-compatible `chat/completions` format. Anthropic uses the native Messages API format.
 
 ## MiniMax defaults
 

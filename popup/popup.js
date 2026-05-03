@@ -1,38 +1,35 @@
 const statusNode = document.querySelector("#status");
 const form = document.querySelector("#api-form");
 const providerInput = document.querySelector("#provider");
+const apiStyleInput = document.querySelector("#apiStyle");
 const endpointInput = document.querySelector("#endpoint");
 const modelInput = document.querySelector("#model");
 const apiKeyInput = document.querySelector("#apiKey");
 const openOptionsButton = document.querySelector("#open-options");
 const openAmazonButton = document.querySelector("#open-amazon");
 
-const PRESETS = {
-  minimax: {
-    endpoint: "https://api.minimax.io/v1/chat/completions",
-    model: "MiniMax-M2.7",
-  },
-  custom: {
-    endpoint: "",
-    model: "",
-  },
-};
+let providerPresets = {};
 
 init();
 
 async function init() {
+  providerPresets = await loadProviderPresets();
+  renderProviderOptions(providerPresets);
+
   const settings = await chrome.storage.sync.get({
     provider: "minimax",
-    endpoint: PRESETS.minimax.endpoint,
-    model: PRESETS.minimax.model,
+    apiStyle: "openai",
+    endpoint: providerPresets.minimax.endpoint,
+    model: providerPresets.minimax.model,
     apiKey: "",
     temperature: 0.2,
     markets: ["US", "CN", "DE", "FR", "ES", "JP"],
   });
 
   providerInput.value = settings.provider || "minimax";
-  endpointInput.value = settings.endpoint || PRESETS.minimax.endpoint;
-  modelInput.value = settings.model || PRESETS.minimax.model;
+  apiStyleInput.value = settings.apiStyle || getPreset(providerInput.value).apiStyle || "openai";
+  endpointInput.value = settings.endpoint || getPreset(providerInput.value).endpoint || "";
+  modelInput.value = settings.model || getPreset(providerInput.value).model || "";
   apiKeyInput.value = settings.apiKey || "";
 
   if (settings.apiKey) {
@@ -44,17 +41,44 @@ async function init() {
   }
 }
 
+async function loadProviderPresets() {
+  const response = await chrome.runtime.sendMessage({ type: "GET_PROVIDER_PRESETS" });
+  if (response?.ok) return response.data;
+  return {
+    minimax: {
+      label: "MiniMax",
+      apiStyle: "openai",
+      endpoint: "https://api.minimax.io/v1/chat/completions",
+      model: "MiniMax-M2.7",
+    },
+    custom: {
+      label: "Custom",
+      apiStyle: "openai",
+      endpoint: "",
+      model: "",
+    },
+  };
+}
+
+function renderProviderOptions(presets) {
+  providerInput.innerHTML = Object.entries(presets)
+    .map(([value, preset]) => `<option value="${escapeHtml(value)}">${escapeHtml(preset.label || value)}</option>`)
+    .join("");
+}
+
 providerInput.addEventListener("change", () => {
-  const preset = PRESETS[providerInput.value];
+  const preset = getPreset(providerInput.value);
   if (!preset) return;
-  if (preset.endpoint) endpointInput.value = preset.endpoint;
-  if (preset.model) modelInput.value = preset.model;
+  apiStyleInput.value = preset.apiStyle || "openai";
+  endpointInput.value = preset.endpoint || "";
+  modelInput.value = preset.model || "";
 });
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const payload = {
     provider: providerInput.value,
+    apiStyle: apiStyleInput.value,
     endpoint: endpointInput.value.trim(),
     model: modelInput.value.trim(),
     apiKey: normalizeApiKey(apiKeyInput.value),
@@ -77,6 +101,10 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+function getPreset(provider) {
+  return providerPresets[provider] || providerPresets.custom || {};
+}
+
 function normalizeApiKey(value) {
   return String(value || "")
     .normalize("NFKC")
@@ -84,6 +112,15 @@ function normalizeApiKey(value) {
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .replace(/\s+/g, "")
     .trim();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 openOptionsButton.addEventListener("click", () => {

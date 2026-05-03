@@ -1,10 +1,74 @@
 const DEFAULT_SETTINGS = {
   provider: "minimax",
+  apiStyle: "openai",
   endpoint: "https://api.minimax.io/v1/chat/completions",
   model: "MiniMax-M2.7",
   apiKey: "",
   temperature: 0.2,
   markets: ["US", "CN", "DE", "FR", "ES", "JP"],
+};
+
+const PROVIDER_PRESETS = {
+  minimax: {
+    label: "MiniMax",
+    apiStyle: "openai",
+    endpoint: "https://api.minimax.io/v1/chat/completions",
+    model: "MiniMax-M2.7",
+  },
+  openai: {
+    label: "OpenAI",
+    apiStyle: "openai",
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    model: "gpt-4o-mini",
+  },
+  openrouter: {
+    label: "OpenRouter",
+    apiStyle: "openai",
+    endpoint: "https://openrouter.ai/api/v1/chat/completions",
+    model: "openai/gpt-4o-mini",
+  },
+  deepseek: {
+    label: "DeepSeek",
+    apiStyle: "openai",
+    endpoint: "https://api.deepseek.com/v1/chat/completions",
+    model: "deepseek-chat",
+  },
+  qwen: {
+    label: "Qwen / Alibaba DashScope",
+    apiStyle: "openai",
+    endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    model: "qwen-plus",
+  },
+  groq: {
+    label: "Groq",
+    apiStyle: "openai",
+    endpoint: "https://api.groq.com/openai/v1/chat/completions",
+    model: "llama-3.3-70b-versatile",
+  },
+  gemini: {
+    label: "Google Gemini",
+    apiStyle: "openai",
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    model: "gemini-2.5-flash",
+  },
+  anthropic: {
+    label: "Anthropic / Claude",
+    apiStyle: "anthropic",
+    endpoint: "https://api.anthropic.com/v1/messages",
+    model: "claude-3-5-haiku-latest",
+  },
+  siliconflow: {
+    label: "SiliconFlow",
+    apiStyle: "openai",
+    endpoint: "https://api.siliconflow.com/v1/chat/completions",
+    model: "Qwen/Qwen3-8B",
+  },
+  custom: {
+    label: "Custom",
+    apiStyle: "openai",
+    endpoint: "",
+    model: "",
+  },
 };
 
 const MARKET_LABELS = {
@@ -27,6 +91,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "GET_SETTINGS") {
     getSettings().then((settings) => sendResponse({ ok: true, data: redactSettings(settings) }));
     return true;
+  }
+
+  if (message?.type === "GET_PROVIDER_PRESETS") {
+    sendResponse({ ok: true, data: PROVIDER_PRESETS });
+    return false;
   }
 
   if (message?.type === "SAVE_SETTINGS") {
@@ -61,7 +130,7 @@ async function analyzeTitle(payload) {
   const cached = await chrome.storage.local.get(cacheKey);
   if (cached[cacheKey]) return { ...cached[cacheKey], cached: true };
 
-  const analysis = await callOpenAICompatible(settings, {
+  const analysis = await callConfiguredProvider(settings, {
     title,
     pageUrl: payload?.pageUrl || "",
     searchKeyword: payload?.searchKeyword || "",
@@ -72,11 +141,16 @@ async function analyzeTitle(payload) {
   return analysis;
 }
 
-async function callOpenAICompatible(settings, context) {
-  const apiKey = normalizeApiKey(settings.apiKey);
-  validateHeaderSafeApiKey(apiKey);
-  const markets = settings.markets.map((market) => `${market}: ${MARKET_LABELS[market] || market}`).join("\n");
-  const prompt = [
+async function callConfiguredProvider(settings, context) {
+  if ((settings.apiStyle || "openai") === "anthropic") {
+    return callAnthropicMessages(settings, context);
+  }
+
+  return callOpenAICompatible(settings, context);
+}
+
+function buildKeywordPrompt(context, markets) {
+  return [
     "You are an Amazon and TikTok cross-border ecommerce keyword research expert.",
     "Analyze the Amazon product title and return localized search terms for product research.",
     "",
@@ -117,13 +191,17 @@ async function callOpenAICompatible(settings, context) {
     `Current search keyword: ${context.searchKeyword || "(none)"}`,
     `Product title: ${context.title}`,
   ].join("\n");
+}
+
+async function callOpenAICompatible(settings, context) {
+  const apiKey = normalizeApiKey(settings.apiKey);
+  validateHeaderSafeApiKey(apiKey);
+  const markets = settings.markets.map((market) => `${market}: ${MARKET_LABELS[market] || market}`).join("\n");
+  const prompt = buildKeywordPrompt(context, markets);
 
   const response = await fetch(settings.endpoint, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: buildOpenAICompatibleHeaders(settings.provider, apiKey),
     body: JSON.stringify({
       model: settings.model,
       temperature: Number(settings.temperature ?? 0.2),
@@ -132,6 +210,47 @@ async function callOpenAICompatible(settings, context) {
           role: "system",
           content: "You produce compact, valid JSON for ecommerce keyword localization.",
         },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    throw new Error(`AI request failed (${response.status}): ${body.slice(0, 240)}`);
+  }
+
+  const payload = JSON.parse(body);
+  const content = extractOpenAICompatibleContent(payload);
+  if (!content) throw new Error("AI response did not contain message content.");
+
+  const parsed = parseJsonContent(content);
+  return normalizeAnalysis(parsed, context.title);
+}
+
+async function callAnthropicMessages(settings, context) {
+  const apiKey = normalizeApiKey(settings.apiKey);
+  validateHeaderSafeApiKey(apiKey);
+  const markets = settings.markets.map((market) => `${market}: ${MARKET_LABELS[market] || market}`).join("\n");
+  const prompt = buildKeywordPrompt(context, markets);
+
+  const response = await fetch(settings.endpoint, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      max_tokens: 1600,
+      temperature: Number(settings.temperature ?? 0.2),
+      system: "You produce compact, valid JSON for ecommerce keyword localization.",
+      messages: [
         {
           role: "user",
           content: prompt,
@@ -146,11 +265,35 @@ async function callOpenAICompatible(settings, context) {
   }
 
   const payload = JSON.parse(body);
-  const content = payload?.choices?.[0]?.message?.content;
+  const content = Array.isArray(payload.content)
+    ? payload.content.filter((item) => item?.type === "text").map((item) => item.text).join("\n")
+    : "";
   if (!content) throw new Error("AI response did not contain message content.");
 
   const parsed = parseJsonContent(content);
   return normalizeAnalysis(parsed, context.title);
+}
+
+function buildOpenAICompatibleHeaders(provider, apiKey) {
+  const headers = {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+  };
+
+  if (provider === "openrouter") {
+    headers["HTTP-Referer"] = "https://github.com/giien/locale-lens";
+    headers["X-Title"] = "LocaleLens";
+  }
+
+  return headers;
+}
+
+function extractOpenAICompatibleContent(payload) {
+  const content = payload?.choices?.[0]?.message?.content;
+  if (Array.isArray(content)) {
+    return content.map((item) => item?.text || item?.content || "").join("\n");
+  }
+  return content;
 }
 
 function parseJsonContent(content) {
@@ -202,9 +345,14 @@ function toStringList(value) {
 
 async function getSettings() {
   const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  const preset = PROVIDER_PRESETS[stored.provider] || PROVIDER_PRESETS.minimax;
   return {
     ...DEFAULT_SETTINGS,
+    ...preset,
     ...stored,
+    apiStyle: stored.apiStyle || preset.apiStyle || DEFAULT_SETTINGS.apiStyle,
+    endpoint: stored.endpoint || preset.endpoint || DEFAULT_SETTINGS.endpoint,
+    model: stored.model || preset.model || DEFAULT_SETTINGS.model,
     markets: Array.isArray(stored.markets) && stored.markets.length ? stored.markets : DEFAULT_SETTINGS.markets,
   };
 }
@@ -212,11 +360,14 @@ async function getSettings() {
 async function saveSettings(payload) {
   const apiKey = normalizeApiKey(payload?.apiKey || "");
   if (apiKey) validateHeaderSafeApiKey(apiKey);
+  const provider = String(payload?.provider || DEFAULT_SETTINGS.provider).trim();
+  const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.custom;
 
   const settings = {
-    provider: "minimax",
-    endpoint: String(payload?.endpoint || DEFAULT_SETTINGS.endpoint).trim(),
-    model: String(payload?.model || DEFAULT_SETTINGS.model).trim(),
+    provider,
+    apiStyle: String(payload?.apiStyle || preset.apiStyle || "openai").trim(),
+    endpoint: String(payload?.endpoint || preset.endpoint || DEFAULT_SETTINGS.endpoint).trim(),
+    model: String(payload?.model || preset.model || DEFAULT_SETTINGS.model).trim(),
     apiKey,
     temperature: clamp(Number(payload?.temperature ?? DEFAULT_SETTINGS.temperature), 0, 1),
     markets: Array.isArray(payload?.markets) && payload.markets.length ? payload.markets : DEFAULT_SETTINGS.markets,

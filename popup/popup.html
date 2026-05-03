@@ -16,9 +16,14 @@
       <form id="api-form" class="panel">
         <label>
           <span>Provider</span>
-          <select id="provider">
-            <option value="minimax">MiniMax</option>
-            <option value="custom">自定义 OpenAI-compatible</option>
+          <select id="provider"></select>
+        </label>
+
+        <label>
+          <span>API Style</span>
+          <select id="apiStyle">
+            <option value="openai">OpenAI-compatible</option>
+            <option value="anthropic">Anthropic Messages</option>
           </select>
         </label>
 
